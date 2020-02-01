@@ -11,22 +11,23 @@ pub enum Term {
     Compound(String, Vec<Term>),
 }
 
-pub fn atom(s: &str) -> Term {
-    Term::Atom(String::from(s))
-}
-pub fn variable(s: &str) -> Term {
-    Term::Variable(String::from(s))
-}
-pub fn compound(s: &str, v: Vec<Term>) -> Term {
-    Term::Compound(String::from(s), v)
-}
+// For easier construction
+pub mod helper {
+    use super::*;
+    pub fn atom(s: &str) -> Term {
+        Term::Atom(String::from(s))
+    }
+    pub fn variable(s: &str) -> Term {
+        Term::Variable(String::from(s))
+    }
 
-#[macro_export]
-macro_rules! compound {
-    ($name:tt : $($s:expr),+) => {
-        compound($name, vec![$($s),+])
-    };
-    ($name:tt) => {
-        compound($name, Vec::new())
-    };
+    #[macro_export]
+    macro_rules! compound {
+        ($name:tt : $($s:expr),+) => {
+            $crate::Term::Compound(String::from($name), vec![$($s),+])
+        };
+        ($name:tt) => {
+            $crate::Term::Compound(String::from($name), Vec::new())
+        };
+    }
 }

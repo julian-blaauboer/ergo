@@ -2,7 +2,8 @@ extern crate ergo;
 
 fn main() {
     // For readability of terms.
-    use ergo::{compound, atom, variable};
+    use ergo::helper::{atom, variable};
+    use ergo::compound;
 
     // Create a new universe.
     let mut uni = ergo::resolution::Universe::new();
