@@ -90,6 +90,7 @@ pub struct QueryResult<'a> {
     universe: &'a Universe,
     generator: VariableGenerator,
     stack: VecDeque<(Vec<Term>, HashMap<String, Term>)>,
+    cut_markers: Vec<usize>,
 }
 
 impl Universe {
@@ -116,6 +117,7 @@ impl Universe {
             universe: self,
             generator: VariableGenerator::new(),
             stack: VecDeque::from(vec![(queries, HashMap::new())]),
+            cut_markers: Vec::new(),
         }
     }
 }
@@ -153,18 +155,37 @@ where
 
 impl<'a> Iterator for QueryResult<'a> {
     type Item = HashMap<String, Term>;
-    /// Return the next solution (backtracking).
+    /// Return the next solution (backtracking) using stack based Depth First Search (DFS).
     fn next(&mut self) -> Option<Self::Item> {
-        // Stack based Depth First Search (DFS).
-
         // If the stack is empty, fail.
         while self.stack.len() > 0 {
             // Pop the next query from the stack.
             let (queries, instantiations) = self.stack.pop_back().unwrap();
-
+        
             // If there aren't any queries, succeed.
             if queries.len() == 0 {
                 return Some(instantiations);
+            }
+
+            // Cut only cuts backtracking of the current predicate, so we need to keep track of predicate boundaries.
+            let cut_before = self.stack.len();
+            if cut_before <= self.cut_markers.last().cloned().unwrap_or(0) {
+                self.cut_markers.pop();
+            }
+
+            // Hard coded exception for cut, cut needs to be a literal atom.
+            // Cutting every branch is trivial (just clear the stack). However, only the current predicate
+            // is affected so the algorithm must keep track where the evaluation of a new predicate begins
+            // and ends. This is done using the cut_markers vector.
+            if let Term::Atom(s) = &queries[0] {
+                if s == "!" {
+                    // Cut all other branches until the last predicate boundary
+                    self.stack.resize(self.cut_markers.pop().unwrap_or(0), (Vec::new(), HashMap::new()));
+                    let new_query = queries[1..].to_vec();
+                    self.stack.push_back((new_query, instantiations));
+                    self.cut_markers.push(self.stack.len());
+                    continue;
+                }
             }
 
             // Iterate over the unifiable clauses in the universe.
@@ -177,6 +198,12 @@ impl<'a> Iterator for QueryResult<'a> {
                 let mut new_query = (m.0).1.clone();
                 new_query.extend_from_slice(&queries[1..]);
                 self.stack.push_back((new_query, m.1));
+            }
+
+            // If new predicates have been pushed, add a new predicate boundary marker.
+            let cut_after = self.stack.len();
+            if cut_after > cut_before {
+                self.cut_markers.push(cut_before);
             }
         }
         // Fail.
